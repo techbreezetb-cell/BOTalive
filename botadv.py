@@ -10,12 +10,12 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # ==== BOT CONFIG ====
-BOT_TOKEN = os.getenv("BOT_TOKEN")
+BOT_TOKEN = os.getenv("8136580879:AAG_LCUUQhctxfnUspJoFNU-KHmmzIQNamE")
 if not BOT_TOKEN:
     raise ValueError("BOT_TOKEN not found in environment variables")
 
 try:
-    OWNER_ID = int(os.getenv("OWNER_ID"))
+    OWNER_ID = int(os.getenv("8126299341"))
 except (TypeError, ValueError):
     raise ValueError("OWNER_ID not found or invalid in environment variables")
 
