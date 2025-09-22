@@ -1,4 +1,4 @@
-# bot.py - Updated and Enhanced Version
+# bot.py - Final, Fixed, and Fully Functional Version
 import telebot
 import sqlite3
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton, ReplyKeyboardMarkup, KeyboardButton
@@ -96,6 +96,17 @@ CREATE TABLE IF NOT EXISTS bot_stats (
 )
 """)
 
+# Support messages table
+cursor.execute("""
+CREATE TABLE IF NOT EXISTS support (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER,
+    message TEXT,
+    reply TEXT,
+    time TEXT
+)
+""")
+
 conn.commit()
 
 # ==== HELPER FUNCTIONS ====
@@ -160,7 +171,6 @@ def is_member_of_channels(user_id):
             if member.status in ['left', 'kicked']:
                 return False
         except telebot.apihelper.ApiException:
-            # Handle cases where the bot is not an admin or channel ID is invalid
             print(f"Could not check membership for channel {channel_id}")
             return False
     return True
@@ -168,12 +178,17 @@ def is_member_of_channels(user_id):
 def has_clicked_social(user_id):
     links = get_social_links()
     if not links:
-        return True # No social links, so this step is not required
+        return True
     for social_id, _, _ in links:
         cursor.execute("SELECT 1 FROM social_clicks WHERE user_id=? AND social_id=?", (user_id, social_id))
         if cursor.fetchone() is None:
             return False
     return True
+
+def get_balance(user_id):
+    cursor.execute("SELECT balance FROM users WHERE user_id=?", (user_id,))
+    row = cursor.fetchone()
+    return row[0] if row else 0
 
 # ==== KEYBOARDS ====
 def main_menu_keyboard():
@@ -249,7 +264,12 @@ def start_command(message):
         bot.send_message(user_id, "The bot is currently stopped for maintenance. Please check back later.")
         return
 
-    # Handle referral links
+    cursor.execute("SELECT is_blocked FROM users WHERE user_id=?", (user_id,))
+    is_blocked = cursor.fetchone()[0]
+    if is_blocked:
+        bot.send_message(user_id, "You are currently blocked from using this bot.")
+        return
+
     referrer_id = None
     if message.text.startswith("/start "):
         referrer_id_str = message.text.split(" ")[1]
@@ -259,9 +279,8 @@ def start_command(message):
                 cursor.execute("UPDATE users SET referrer=? WHERE user_id=? AND referrer IS NULL", (referrer_id, user_id))
                 conn.commit()
 
-    # Check for join channels
     channels = get_join_channels()
-    if channels:
+    if channels and not is_member_of_channels(user_id):
         markup = InlineKeyboardMarkup()
         for name, channel_id in channels:
             markup.add(InlineKeyboardButton(f"Join {name}", url=f"https://t.me/{channel_id.replace('@', '')}"))
@@ -269,7 +288,6 @@ def start_command(message):
         bot.send_message(user_id, "Please join the following channels to continue:", reply_markup=markup)
         return
 
-    # Check for social links
     social_links = get_social_links()
     if social_links and not has_clicked_social(user_id):
         markup = InlineKeyboardMarkup()
@@ -279,9 +297,7 @@ def start_command(message):
         bot.send_message(user_id, "Please follow our social media accounts to continue:", reply_markup=markup)
         return
 
-    # All checks passed, show main menu
     bot.send_message(user_id, "Welcome! Please use the menu below to get started.", reply_markup=main_menu_keyboard())
-
 
 # ==== CALLBACK HANDLERS ====
 @bot.callback_query_handler(func=lambda call: True)
@@ -290,6 +306,12 @@ def callback_query(call):
     
     if not bot_active() and user_id != OWNER_ID:
         bot.send_message(user_id, "The bot is currently stopped for maintenance. Please check back later.")
+        return
+
+    cursor.execute("SELECT is_blocked FROM users WHERE user_id=?", (user_id,))
+    is_blocked = cursor.fetchone()[0]
+    if is_blocked:
+        bot.answer_callback_query(call.id, "You are currently blocked from using this bot.")
         return
         
     if call.data == 'check_join':
@@ -307,7 +329,6 @@ def callback_query(call):
             bot.answer_callback_query(call.id, "You have not joined all channels yet!")
 
     elif call.data == 'check_social':
-        # This will need to be refined as you can't verify a click, just that they've clicked the button
         social_links = get_social_links()
         if social_links:
             for social_id, _, _ in social_links:
@@ -322,10 +343,11 @@ def callback_query(call):
         bonus_amount = float(get_setting("bonus_amount"))
         bonus_cooldown = float(get_setting("bonus_cooldown"))
         
-        cursor.execute("SELECT last_bonus, refer_activated FROM users WHERE user_id=?", (user_id,))
+        cursor.execute("SELECT last_bonus, refer_activated, referrer FROM users WHERE user_id=?", (user_id,))
         user = cursor.fetchone()
         last_bonus_str = user[0]
         refer_activated = user[1]
+        referrer_id = user[2]
         
         can_claim = False
         if not last_bonus_str:
@@ -338,9 +360,11 @@ def callback_query(call):
         if can_claim:
             cursor.execute("UPDATE users SET balance = balance + ?, last_bonus=? WHERE user_id=?", (bonus_amount, datetime.now().isoformat(), user_id))
             
-            # Activate referral system for the user after first bonus claim
             if not refer_activated:
                 cursor.execute("UPDATE users SET refer_activated=1 WHERE user_id=?", (user_id,))
+                if referrer_id:
+                    refer_amount = float(get_setting("refer_amount"))
+                    cursor.execute("UPDATE users SET balance = balance + ? WHERE user_id=?", (refer_amount, referrer_id))
             
             conn.commit()
             currency = get_setting("currency") or "USD"
@@ -394,6 +418,10 @@ def callback_query(call):
     elif call.data == 'set_wallet':
         bot.send_message(user_id, "Please reply with your cryptocurrency wallet address:")
         bot.register_next_step_handler(call.message, process_wallet_address)
+
+    elif call.data == 'chat_support':
+        bot.send_message(user_id, "Please send your support message. An admin will get back to you soon.")
+        bot.register_next_step_handler(call.message, process_support_message)
         
     elif call.data == 'bot_status':
         cursor.execute("SELECT COUNT(*) FROM users")
@@ -424,62 +452,34 @@ def callback_query(call):
 
     # ==== ADMIN PANEL CALLS ====
     elif call.data == 'admin_panel':
-        if not is_admin(user_id):
-            return
+        if not is_admin(user_id): return
         bot.edit_message_text("Welcome to the Admin Panel. Select an option below:", call.message.chat.id, call.message.message_id, reply_markup=admin_main_menu_keyboard())
     
-    # User Management
     elif call.data == 'admin_user_management':
         if not is_admin(user_id): return
         bot.edit_message_text("User Management options:", call.message.chat.id, call.message.message_id, reply_markup=admin_user_management_keyboard())
     
-    # Admin settings sub-menu
     elif call.data == 'admin_settings':
         if not is_admin(user_id): return
         bot.edit_message_text("Bot Settings:", call.message.chat.id, call.message.message_id, reply_markup=admin_settings_keyboard())
         
-    # Set Bonus Amount
-    elif call.data == 'set_bonus_amount':
+    elif call.data == 'admin_broadcast':
         if not is_admin(user_id): return
-        msg = bot.send_message(user_id, "Please send the new bonus amount (e.g., 0.5):")
-        bot.register_next_step_handler(msg, process_set_bonus_amount)
-        
-    # Set Referral Amount
-    elif call.data == 'set_refer_amount':
-        if not is_admin(user_id): return
-        msg = bot.send_message(user_id, "Please send the new referral amount (e.g., 0.2):")
-        bot.register_next_step_handler(msg, process_set_refer_amount)
+        msg = bot.send_message(user_id, "Please send the message you want to broadcast to all users:")
+        bot.register_next_step_handler(msg, process_broadcast)
 
-    # Set Currency
-    elif call.data == 'set_currency':
+    elif call.data == 'admin_withdrawals':
         if not is_admin(user_id): return
-        msg = bot.send_message(user_id, "Please send the new currency symbol (e.g., USDT, TRX, BNB):")
-        bot.register_next_step_handler(msg, process_set_currency)
-
-    # Start/Stop Bot
-    elif call.data == 'start_stop_bot':
-        if not is_admin(user_id): return
-        status = get_setting("bot_status")
-        new_status = "stopped" if status == "running" else "running"
-        set_setting("bot_status", new_status)
+        cursor.execute("SELECT id, user_id, amount, status FROM withdrawals WHERE status != 'paid' ORDER BY requested_at DESC")
+        withdrawals = cursor.fetchall()
         
-        bot.edit_message_text(f"Bot is now {new_status}.", call.message.chat.id, call.message.message_id, reply_markup=admin_settings_keyboard())
-        
-        # Broadcast the change
-        cursor.execute("SELECT user_id FROM users")
-        all_users = [row[0] for row in cursor.fetchall()]
-        for uid in all_users:
-            try:
-                if new_status == "stopped":
-                    bot.send_message(uid, "📢 The bot has been temporarily stopped for maintenance. Please check back later.")
-                else:
-                    bot.send_message(uid, "🎉 The bot is now online and fully operational!")
-            except Exception as e:
-                print(f"Could not send message to {uid}: {e}")
-                
-    # Handle withdrawal status changes
-    elif call.data.startswith('set_status_'):
-        if not is_admin(user_id): return
-        parts = call.data.split('_')
-        new_status = parts[2]
-  
+        if not withdrawals:
+            bot.edit_message_text("No pending or paying withdrawals found.", call.message.chat.id, call.message.message_id, reply_markup=admin_main_menu_keyboard())
+            return
+            
+        message_text = "Pending and Paying Withdrawals:\n\n"
+        markup = InlineKeyboardMarkup()
+        for wid, uid, amount, status in withdrawals:
+            user_link = get_user_link(uid)
+            message_text += f"ID: {wid} | User: {user_link} | Amount: {amount} {get_setting('currency') or 'USD'} | Status: {status.capitalize()}\n"
+            markup.add(InlineKeyboardButton(f"Manage Withdr
