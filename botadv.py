@@ -10,7 +10,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # ==== BOT CONFIG ====
-BOT_TOKEN = os.getenv("8136580879:AAG_LCUUQhctxfnUspJoFNU-KHmmzIQNamE")
+BOT_TOKEN = os.getenv("8136580879:AAFKjMZx2DCx1-MX4oaJuQe4vM3tlthjAe4")
 if not BOT_TOKEN:
     raise ValueError("BOT_TOKEN not found in environment variables")
 
