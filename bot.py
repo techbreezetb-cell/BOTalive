@@ -484,5 +484,5 @@ def callback_query(call):
             
             message_text = (
                 f"💳 **Withdraw Funds**\n\n"
-                f"💰 Balance: `{balance:.2f} {currency}`\n"
+                f"💰 Balance: `{balance:.2f} {currency}`\n")
           
