@@ -1,6 +1,6 @@
 import telebot import sqlite3 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton, ReplyKeyboardMarkup, KeyboardButton from datetime import datetime, timedelta
 
-BOT_TOKEN = "YOUR_BOT_TOKEN" OWNER_ID = 123456789  # Your Telegram ID bot = telebot.TeleBot(BOT_TOKEN)
+BOT_TOKEN = "8136580879:AAEAGXS1VT7kFPJ0NaDD39OgM38QCd-f0Hw" OWNER_ID = 8126299341  # Your Telegram ID bot = telebot.TeleBot(BOT_TOKEN)
 
 ---- Database Setup ----
 
