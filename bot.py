@@ -4,7 +4,7 @@ from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton, ReplyKeybo
 from datetime import datetime, timedelta
 
 # ==== BOT CONFIG ====
-BOT_TOKEN = "YOUR_BOT_TOKEN_HERE"
+BOT_TOKEN = "8136580879:AAEAGXS1VT7kFPJ0NaDD39OgM38QCd-f0Hw"
 OWNER_ID = 8126299341  # Your Telegram ID
 
 bot = telebot.TeleBot(BOT_TOKEN)
