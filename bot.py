@@ -6,7 +6,7 @@ from datetime import datetime, timedelta
 import re
 
 # ==== BOT CONFIG ====
-BOT_TOKEN = "8136580879:AAEAGXS1VT7kFPJ0NaDD39OgM38QCd-f0Hw"
+BOT_TOKEN = "8136580879:AAEMXj7nMnaUd8_R39xXbDJAJ2EJNeYPUas"
 OWNER_ID = 8126299341  # Your Telegram ID (change accordingly)
 
 bot = telebot.TeleBot(BOT_TOKEN)
