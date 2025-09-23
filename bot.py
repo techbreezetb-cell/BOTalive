@@ -10,14 +10,8 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # ==== BOT CONFIG ====
-BOT_TOKEN = os.getenv("8136580879:AAEEirCleBUnWgoJlJ-YFP5hxnVN16dn5NU")
-if not BOT_TOKEN:
-    raise ValueError("BOT_TOKEN not found in environment variables")
-
-try:
-    OWNER_ID = int(os.getenv("8126299341"))
-except (TypeError, ValueError):
-    raise ValueError("OWNER_ID not found or invalid in environment variables")
+BOT_TOKEN = "8136580879:AAEEirCleBUnWgoJlJ-YFP5hxnVN16dn5NU"
+    OWNER_ID = "8126299341"
 
 bot = telebot.TeleBot(BOT_TOKEN)
 
