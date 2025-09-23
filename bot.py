@@ -8,7 +8,7 @@ import os
 
 # ==== BOT CONFIG ====
 # IMPORTANT: Put your bot token and your owner ID here.
-BOT_TOKEN = "8136580879:AAEMXj7nMnaUd8_R39xXbDJAJ2EJNeYPUas"
+BOT_TOKEN = "8136580879:AAHgjjLOGc3LqAaVoU-MiSo0wf0JNOoxjIs"
 OWNER_ID = 8126299341
 
 bot = telebot.TeleBot(BOT_TOKEN)
